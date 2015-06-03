@@ -1,0 +1,10 @@
+name = Admin Pay Cart
+description = This module allows admin user to pay carts from other customers
+package = Commerce
+version = 7.x-alpha
+
+dependencies[] = commerce
+dependencies[] = commerce_osp
+
+core = 7.x
+php = 5.3

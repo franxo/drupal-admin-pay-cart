@@ -1,0 +1,72 @@
+<?php
+
+/**
+ * @file
+ * This module allows admin user to pay carts from other customers
+ */
+
+/**
+* Implements hook_menu().
+*/
+function admin_pay_cart_menu() {
+
+  $items['admin/commerce/pay-carts'] = array(
+    'title' => 'Pay Cart',
+    'description' => 'Pay carts from other customers.',
+    'page callback' => 'drupal_get_form',
+    'page arguments' => array('admin_pay_cart_form'),
+    'access callback' => 'user_access',
+    'access arguments' => array('administer users'),
+    'type' => MENU_NORMAL_ITEM,
+  );
+  return $items;
+
+}
+
+function admin_pay_cart_form($form, $form_state) {
+
+  $form['order_id'] = array(
+    '#type' => 'textfield',
+    '#title' => t('Order Id'), 
+  );
+
+
+  $form['submit'] = array(
+    '#type' => 'submit',
+    '#value' => t('Submit'),
+  );
+  return $form;
+
+}
+
+function admin_pay_cart_form_submit($form, $form_state) {
+  $order_id = $form_state['values']['order_id'];
+  $user_cart = commerce_order_load($order_id);
+  if ($user_cart->status == 'cart') {
+    $payment_method = commerce_payment_method_instance_load('offsitedetails|commerce_payment_offsitedetails');
+
+    if (!$payment_method) {
+      drupal_set_message("No example payment method found, we can't mark order as fully paid. Please enable commerce_payment_example module to use this feature.");
+    }
+    else {
+      drupal_set_message("Creating new transaction ...");
+      $charge = $user_cart->commerce_order_total['und'][0];
+      $transaction = commerce_payment_transaction_new('offsitedetails', $user_cart->order_id);
+      $transaction->instance_id = $payment_method['instance_id'];
+      $transaction->amount = $charge['amount'];
+      $transaction->currency_code = $charge['currency_code'];
+      $transaction->status = COMMERCE_PAYMENT_STATUS_SUCCESS;
+      $transaction->message = 'Order paid by admin.';
+      drupal_set_message("Link transaction with order ...");
+      commerce_payment_transaction_save($transaction);
+      commerce_payment_commerce_payment_transaction_insert($transaction);
+      drupal_set_message("Setting order as completed ...");
+      commerce_order_status_update($user_cart, 'completed');
+      drupal_set_message("Done.");
+      commerce_checkout_complete($user_cart);
+    }
+  }
+  else {
+    drupal_set_message('This order is not a cart', 'error');
+  }
+}
